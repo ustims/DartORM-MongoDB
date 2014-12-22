@@ -146,7 +146,6 @@ class MongoDBAdapter extends DBAdapter {
   }
 
   Future update(Update update) async {
-    print(update);
     var collection = await _connection.collection(update.table.tableName);
 
     Field pKey = update.table.getPrimaryKeyField();

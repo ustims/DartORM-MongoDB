@@ -1,3 +1,8 @@
+0.0.5
+-----
+
+- Example usage added, some refactorings.
+
 0.0.2
 -----
 
