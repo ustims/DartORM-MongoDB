@@ -1,35 +1,24 @@
 library dart_orm_adapter_mongodb;
 
-import 'package:dart_orm';
+import 'dart:async';
 
-class MongoAdapter extends DBAdapter {
-  dynamic _connection;
-  dynamic _mongoSelectorBuilderType;
-  dynamic _mongoUpdateBuilderType;
-  dynamic createQueryDbCommand;
+import 'package:dart_orm/dart_orm.dart';
+import 'package:mongo_dart/mongo_dart.dart' as mongo_connector;
 
-  MongoAdapter(dynamic connection,
-               dynamic this._mongoSelectorBuilderType,
-               dynamic this._mongoUpdateBuilderType,
-               this.createQueryDbCommand) {
-    _connection = connection;
+class MongoDBAdapter extends DBAdapter {
+  String _connectionString;
+  mongo_connector.Db _connection;
+
+  MongoDBAdapter(String connectionString) {
+    _connectionString = connectionString;
+  }
+
+  Future connect() async {
+    _connection = new mongo_connector.Db(_connectionString);
+    await _connection.open();
   }
 
   get connection => _connection;
-
-  dynamic getMongoSelectorBuilder() {
-    ClassMirror classMirror = reflectClass(_mongoSelectorBuilderType);
-
-    var instance = classMirror.newInstance(new Symbol(''), []);
-    return instance.reflectee;
-  }
-
-  dynamic getMongoUpdateBuilder() {
-    ClassMirror classMirror = reflectClass(_mongoUpdateBuilderType);
-
-    var instance = classMirror.newInstance(new Symbol(''), []);
-    return instance.reflectee;
-  }
 
   dynamic convertCondition(Table table, Condition cond) {
     var w = null;
@@ -46,13 +35,13 @@ class MongoAdapter extends DBAdapter {
 
     switch (cond.condition) {
       case '=':
-        w = getMongoSelectorBuilder().eq(cond.firstVar, cond.secondVar);
+        w = mongo_connector.where.eq(cond.firstVar, cond.secondVar);
         break;
       case '>':
-        w = getMongoSelectorBuilder().gt(cond.firstVar, cond.secondVar);
+        w = mongo_connector.where.gt(cond.firstVar, cond.secondVar);
         break;
       case '<':
-        w = getMongoSelectorBuilder().lt(cond.firstVar, cond.secondVar);
+        w = mongo_connector.where.lt(cond.firstVar, cond.secondVar);
         break;
     }
 
@@ -91,7 +80,7 @@ class MongoAdapter extends DBAdapter {
       }
 
       if (mongoSelector == null) {
-        mongoSelector = getMongoSelectorBuilder().ne('_id', null);
+        mongoSelector = mongo_connector.where.ne('_id', null);
       }
 
       if (select.sorts.length > 0) {
@@ -133,14 +122,12 @@ class MongoAdapter extends DBAdapter {
   }
 
   Future createTable(Table table) async {
-    // check if table has primary key
     Field pKey = table.getPrimaryKeyField();
     if (pKey != null) {
       await createSequence(table, pKey);
     }
 
     var createdCollection = await _connection.collection(table.tableName);
-    print(createdCollection);
     return true;
   }
 
@@ -168,8 +155,8 @@ class MongoAdapter extends DBAdapter {
     }
 
     var selector = convertCondition(update.table, update.condition);
-    var modifiers = getMongoUpdateBuilder();
-    for(String fieldName in update.fieldsToUpdate.keys){
+    var modifiers = mongo_connector.modify;
+    for (String fieldName in update.fieldsToUpdate.keys) {
       modifiers.set(fieldName, update.fieldsToUpdate[fieldName]);
     }
 
@@ -181,7 +168,7 @@ class MongoAdapter extends DBAdapter {
     var countersCollection = await _connection.collection('counters');
 
     var existingCounter = await countersCollection.findOne(
-        getMongoSelectorBuilder().eq(
+        mongo_connector.where.eq(
             '_id', "${table.tableName}_${field.fieldName}_seq")
     );
     if (existingCounter == null) {
@@ -210,7 +197,8 @@ class MongoAdapter extends DBAdapter {
         'new': true
     };
 
-    _connection.executeDbCommand(createQueryDbCommand(_connection, command))
+    _connection.executeDbCommand(
+        mongo_connector.DbCommand.createQueryDbCommand(_connection, command))
     .then((Map result) {
       var value = result['value']['seq'];
       completer.complete(value);

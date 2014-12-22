@@ -1,3 +1,8 @@
+0.0.2
+-----
+
+- Constructor fix, connect() method introduced.
+
 0.0.1
 -----
 
