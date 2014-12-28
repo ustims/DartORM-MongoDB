@@ -1,3 +1,9 @@
+0.0.6
+-----
+
+- All print logs changed to log.* from logging package.
+
+
 0.0.5
 -----
 

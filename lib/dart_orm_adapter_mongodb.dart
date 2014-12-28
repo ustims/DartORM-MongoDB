@@ -5,7 +5,12 @@ import 'dart:async';
 import 'package:dart_orm/dart_orm.dart';
 import 'package:mongo_dart/mongo_dart.dart' as mongo_connector;
 
+import 'package:logging/logging.dart';
+
+
 class MongoDBAdapter extends DBAdapter {
+  final Logger log = new Logger('MongoDBAdapter');
+
   String _connectionString;
   mongo_connector.Db _connection;
 
@@ -63,7 +68,11 @@ class MongoDBAdapter extends DBAdapter {
   Future<List> select(Select select) {
     Completer completer = new Completer();
 
+    log.finest('Select:' + select.toString());
+
     List found = new List();
+    var mongoSelector = null;
+
     _connection.listCollections()
     .then((List collections) {
       if (!collections.contains(select.table.tableName)) {
@@ -73,8 +82,6 @@ class MongoDBAdapter extends DBAdapter {
       return _connection.collection(select.table.tableName);
     })
     .then((collection) {
-      var mongoSelector = null;
-
       if (select.condition != null) {
         mongoSelector = convertCondition(select.table, select.condition);
       }
@@ -101,6 +108,8 @@ class MongoDBAdapter extends DBAdapter {
 
       }
 
+      log.finest('Mongo selector:' + mongoSelector.toString());
+
       return collection.find(mongoSelector).forEach((value) {
         // for each found value, if select.table contains primary key
         // we need to change '_id' to that primary key name
@@ -112,9 +121,11 @@ class MongoDBAdapter extends DBAdapter {
       });
     })
     .then((a) {
+      log.finest('Results for $mongoSelector:' + found.toString());
       completer.complete(found);
     })
     .catchError((e) {
+      log.shout('Select failed for $mongoSelector', e);
       completer.completeError(e);
     });
 
@@ -123,15 +134,22 @@ class MongoDBAdapter extends DBAdapter {
 
   Future createTable(Table table) async {
     Field pKey = table.getPrimaryKeyField();
+
+    log.finest('Create table:' + table.toString());
+
     if (pKey != null) {
       await createSequence(table, pKey);
     }
 
     var createdCollection = await _connection.collection(table.tableName);
+
+    log.finest('Create table result:' + createdCollection.toString());
     return true;
   }
 
   Future insert(Insert insert) async {
+    log.finest('Insert:' + insert.toString());
+
     var collection = await _connection.collection(insert.table.tableName);
 
     Field pKey = insert.table.getPrimaryKeyField();
@@ -142,10 +160,14 @@ class MongoDBAdapter extends DBAdapter {
     }
 
     var insertResult = await collection.insert(insert.fieldsToInsert);
+
+    log.finest('Insert result:', insertResult);
     return primaryKeyValue;
   }
 
   Future update(Update update) async {
+    log.finest('Update:' + update.toString());
+
     var collection = await _connection.collection(update.table.tableName);
 
     Field pKey = update.table.getPrimaryKeyField();
@@ -160,10 +182,14 @@ class MongoDBAdapter extends DBAdapter {
     }
 
     var updateResult = await collection.update(selector, modifiers);
+
+    log.finest('Update result:', updateResult);
+
     return updateResult;
   }
 
   Future createSequence(Table table, Field field) async {
+    log.finest('Create sequence:' + table.toString() + ' ' + field.toString());
     var countersCollection = await _connection.collection('counters');
 
     var existingCounter = await countersCollection.findOne(
@@ -175,11 +201,16 @@ class MongoDBAdapter extends DBAdapter {
           '_id': "${table.tableName}_${field.fieldName}_seq",
           'seq': 0
       });
+
+      log.finest('Create sequence insert result:', insertResult);
     }
   }
 
   Future<int> getNextSequence(Table table, Field field) {
     Completer completer = new Completer();
+
+    log.finest('Get next sequence:' + table.toString() + ' ' +
+    field.toString());
 
     String seqName = "${table.tableName}_${field.fieldName}_seq";
 
@@ -199,10 +230,18 @@ class MongoDBAdapter extends DBAdapter {
     _connection.executeDbCommand(
         mongo_connector.DbCommand.createQueryDbCommand(_connection, command))
     .then((Map result) {
-      var value = result['value']['seq'];
-      completer.complete(value);
+      log.finest('Get next sequence result:');
+      log.finest(result);
+
+      if (result['value'] == null) {
+        completer.complete(null);
+      } else {
+        var value = result['value']['seq'];
+        completer.complete(value);
+      }
     })
     .catchError((e) {
+      log.shout('Get next sequence error:', e);
       completer.completeError(e);
     });
 

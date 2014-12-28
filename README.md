@@ -7,7 +7,7 @@ Usage example
 -------------
 
 ```dart
-import 'package:dart_orm/dart_orm.dart';
+import 'package:dart_orm/dart_orm.dart' as ORM;
 import 'package:dart_orm_adapter_mongodb/dart_orm_adapter_mongodb.dart';
 
 ...
