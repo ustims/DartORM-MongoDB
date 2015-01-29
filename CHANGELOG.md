@@ -1,3 +1,9 @@
+0.0.7
+-----
+
+- Proper .limit() handling.
+
+
 0.0.6
 -----
 

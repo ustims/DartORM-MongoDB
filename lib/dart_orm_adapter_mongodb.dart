@@ -38,6 +38,11 @@ class MongoDBAdapter extends DBAdapter {
       }
     }
 
+    // TODO: type checking here
+    // problem: ORM.Find f = new ORM.Find(User)
+    // ..where(new ORM.LowerThan('id', 4)) -- ok
+    // ..where(new ORM.LowerThan('id', '4')) -- silently returns empty list
+
     switch (cond.condition) {
       case '=':
         w = mongo_connector.where.eq(cond.firstVar, cond.secondVar);
@@ -105,7 +110,10 @@ class MongoDBAdapter extends DBAdapter {
             mongoSelector = mongoSelector.sortBy(fieldName, descending:true);
           }
         }
+      }
 
+      if (select.limit != null) {
+        mongoSelector.limit(select.limit);
       }
 
       log.finest('Mongo selector:' + mongoSelector.toString());
@@ -172,7 +180,7 @@ class MongoDBAdapter extends DBAdapter {
 
     Field pKey = update.table.getPrimaryKeyField();
     if (pKey == null) {
-      throw new Exception('Could not update a table row withour primary key.');
+      throw new Exception('Could not update a table row without primary key.');
     }
 
     var selector = convertCondition(update.table, update.condition);
