@@ -7,7 +7,6 @@ import 'package:mongo_dart/mongo_dart.dart' as mongo_connector;
 
 import 'package:logging/logging.dart';
 
-
 class MongoDBAdapter extends DBAdapter {
   final Logger log = new Logger('MongoDBAdapter');
 
@@ -78,15 +77,13 @@ class MongoDBAdapter extends DBAdapter {
     List found = new List();
     var mongoSelector = null;
 
-    _connection.listCollections()
-    .then((List collections) {
+    _connection.listCollections().then((List collections) {
       if (!collections.contains(select.table.tableName)) {
         throw new TableNotExistException();
       }
 
       return _connection.collection(select.table.tableName);
-    })
-    .then((collection) {
+    }).then((collection) {
       if (select.condition != null) {
         mongoSelector = convertCondition(select.table, select.condition);
       }
@@ -105,9 +102,9 @@ class MongoDBAdapter extends DBAdapter {
           }
 
           if (select.sorts[fieldName] == 'ASC') {
-            mongoSelector = mongoSelector.sortBy(fieldName, descending:false);
+            mongoSelector = mongoSelector.sortBy(fieldName, descending: false);
           } else {
-            mongoSelector = mongoSelector.sortBy(fieldName, descending:true);
+            mongoSelector = mongoSelector.sortBy(fieldName, descending: true);
           }
         }
       }
@@ -127,12 +124,10 @@ class MongoDBAdapter extends DBAdapter {
         }
         found.add(value);
       });
-    })
-    .then((a) {
+    }).then((a) {
       log.finest('Results for $mongoSelector:' + found.toString());
       completer.complete(found);
-    })
-    .catchError((e) {
+    }).catchError((e) {
       log.shout('Select failed for $mongoSelector', e);
       completer.completeError(e);
     });
@@ -200,15 +195,11 @@ class MongoDBAdapter extends DBAdapter {
     log.finest('Create sequence:' + table.toString() + ' ' + field.toString());
     var countersCollection = await _connection.collection('counters');
 
-    var existingCounter = await countersCollection.findOne(
-        mongo_connector.where.eq(
-            '_id', "${table.tableName}_${field.fieldName}_seq")
-    );
+    var existingCounter = await countersCollection.findOne(mongo_connector.where
+        .eq('_id', "${table.tableName}_${field.fieldName}_seq"));
     if (existingCounter == null) {
-      var insertResult = await countersCollection.insert({
-          '_id': "${table.tableName}_${field.fieldName}_seq",
-          'seq': 0
-      });
+      var insertResult = await countersCollection.insert(
+          {'_id': "${table.tableName}_${field.fieldName}_seq", 'seq': 0});
 
       log.finest('Create sequence insert result:', insertResult);
     }
@@ -217,27 +208,24 @@ class MongoDBAdapter extends DBAdapter {
   Future<int> getNextSequence(Table table, Field field) {
     Completer completer = new Completer();
 
-    log.finest('Get next sequence:' + table.toString() + ' ' +
-    field.toString());
+    log.finest(
+        'Get next sequence:' + table.toString() + ' ' + field.toString());
 
     String seqName = "${table.tableName}_${field.fieldName}_seq";
 
     Map command = {
-        'findAndModify': 'counters',
-        'query': {
-            '_id': seqName
-        },
-        'update': {
-            r'$inc': {
-                'seq': 1
-            }
-        },
-        'new': true
+      'findAndModify': 'counters',
+      'query': {'_id': seqName},
+      'update': {
+        r'$inc': {'seq': 1}
+      },
+      'new': true
     };
 
-    _connection.executeDbCommand(
-        mongo_connector.DbCommand.createQueryDbCommand(_connection, command))
-    .then((Map result) {
+    _connection
+        .executeDbCommand(mongo_connector.DbCommand
+            .createQueryDbCommand(_connection, command))
+        .then((Map result) {
       log.finest('Get next sequence result:');
       log.finest(result);
 
@@ -247,8 +235,7 @@ class MongoDBAdapter extends DBAdapter {
         var value = result['value']['seq'];
         completer.complete(value);
       }
-    })
-    .catchError((e) {
+    }).catchError((e) {
       log.shout('Get next sequence error:', e);
       completer.completeError(e);
     });

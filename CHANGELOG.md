@@ -1,3 +1,8 @@
+0.1.0
+-----
+
+- Support the latest version of `mongo_dart`.
+
 0.0.7
 -----
 
