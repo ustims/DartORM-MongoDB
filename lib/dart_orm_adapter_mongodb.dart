@@ -8,7 +8,7 @@ import 'package:mongo_dart/mongo_dart.dart' as mongo_connector;
 import 'package:logging/logging.dart';
 
 class MongoDBAdapter extends DBAdapter {
-  final Logger log = new Logger('MongoDBAdapter');
+  final Logger log = new Logger('DartORM.MongoDBAdapter');
 
   String _connectionString;
   mongo_connector.Db _connection;
@@ -195,6 +195,19 @@ class MongoDBAdapter extends DBAdapter {
     log.finest('Update result:', updateResult);
 
     return updateResult;
+  }
+
+  Future delete(Delete delete) async {
+    log.finest('Delete: ' + delete.toString());
+
+    var collection = await _connection.collection(delete.table.tableName);
+    Field pKey = delete.table.getPrimaryKeyField();
+    if (pKey == null) {
+      throw new Exception('Could not delete a table row without primary key.');
+    }
+
+    await collection.remove(convertCondition(delete.table, delete.condition));
+    return;
   }
 
   Future createSequence(Table table, Field field) async {
