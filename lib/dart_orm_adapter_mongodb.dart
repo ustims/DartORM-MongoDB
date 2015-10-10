@@ -24,6 +24,12 @@ class MongoDBAdapter extends DBAdapter {
 
   get connection => _connection;
 
+  /// Closes all connections to the database.
+  void close() {
+    _connection.close();
+    log.finest('Connection closed.');
+  }
+
   dynamic convertCondition(Table table, Condition cond) {
     var w = null;
 
