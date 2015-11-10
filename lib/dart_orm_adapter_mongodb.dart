@@ -17,6 +17,8 @@ class MongoDBAdapter extends DBAdapter {
     _connectionString = connectionString;
   }
 
+  Map<String, mongo_connector.DbCollection> _collectionsCache = {};
+
   Future connect() async {
     _connection = new mongo_connector.Db(_connectionString);
     await _connection.open();
@@ -75,7 +77,7 @@ class MongoDBAdapter extends DBAdapter {
     return w;
   }
 
-  Future<List> select(Select select) {
+  Future<List> select(Select select) async {
     Completer completer = new Completer();
 
     log.finest('Select:' + select.toString());
@@ -83,45 +85,54 @@ class MongoDBAdapter extends DBAdapter {
     List found = new List();
     var mongoSelector = null;
 
-    _connection.listCollections().then((List collections) {
-      if (!collections.contains(select.table.tableName)) {
-        throw new TableNotExistException();
+    mongo_connector.DbCollection collection =
+        _collectionsCache[select.table.tableName];
+
+    if (collection == null) {
+      List dbCollections = await _connection.listCollections();
+
+      if (dbCollections.contains(select.table.tableName)) {
+        collection = _connection.collection(select.table.tableName);
       }
+    }
 
-      return _connection.collection(select.table.tableName);
-    }).then((collection) {
-      if (select.condition != null) {
-        mongoSelector = convertCondition(select.table, select.condition);
-      }
+    if (collection == null) {
+      throw new TableNotExistException();
+    }
 
-      if (mongoSelector == null) {
-        mongoSelector = mongo_connector.where.ne('_id', null);
-      }
+    if (select.condition != null) {
+      mongoSelector = convertCondition(select.table, select.condition);
+    }
 
-      if (select.sorts.length > 0) {
-        for (String fieldName in select.sorts.keys) {
-          Field pKey = select.table.getPrimaryKeyField();
-          if (pKey != null) {
-            if (fieldName == pKey.fieldName) {
-              fieldName = '_id';
-            }
-          }
+    if (mongoSelector == null) {
+      mongoSelector = mongo_connector.where.ne('_id', null);
+    }
 
-          if (select.sorts[fieldName] == 'ASC') {
-            mongoSelector = mongoSelector.sortBy(fieldName, descending: false);
-          } else {
-            mongoSelector = mongoSelector.sortBy(fieldName, descending: true);
+    if (select.sorts.length > 0) {
+      for (String fieldName in select.sorts.keys) {
+        Field pKey = select.table.getPrimaryKeyField();
+        if (pKey != null) {
+          if (fieldName == pKey.fieldName) {
+            fieldName = '_id';
           }
         }
+
+        if (select.sorts[fieldName] == 'ASC') {
+          mongoSelector = mongoSelector.sortBy(fieldName, descending: false);
+        } else {
+          mongoSelector = mongoSelector.sortBy(fieldName, descending: true);
+        }
       }
+    }
 
-      if (select.limit != null) {
-        mongoSelector.limit(select.limit);
-      }
+    if (select.limit != null) {
+      mongoSelector.limit(select.limit);
+    }
 
-      log.finest('Mongo selector:' + mongoSelector.toString());
+    log.finest('Mongo selector:' + mongoSelector.toString());
 
-      return collection.find(mongoSelector).forEach((value) {
+    try {
+      var findResult = await collection.find(mongoSelector).forEach((value) {
         // for each found value, if select.table contains primary key
         // we need to change '_id' to that primary key name
         Field f = select.table.getPrimaryKeyField();
@@ -130,15 +141,13 @@ class MongoDBAdapter extends DBAdapter {
         }
         found.add(value);
       });
-    }).then((a) {
-      log.finest('Results for $mongoSelector:' + found.toString());
-      completer.complete(found);
-    }).catchError((e) {
+    } catch (e) {
       log.shout('Select failed for $mongoSelector', e);
-      completer.completeError(e);
-    });
+    }
 
-    return completer.future;
+    log.finest('Results for $mongoSelector:' + found.toString());
+
+    return found;
   }
 
   Future createTable(Table table) async {
@@ -150,7 +159,10 @@ class MongoDBAdapter extends DBAdapter {
       await createSequence(table, pKey);
     }
 
-    var createdCollection = await _connection.collection(table.tableName);
+    mongo_connector.DbCollection createdCollection =
+        await _connection.collection(table.tableName);
+
+    _collectionsCache[table.tableName] = createdCollection;
 
     log.finest('Create table result:' + createdCollection.toString());
     return true;
@@ -202,9 +214,6 @@ class MongoDBAdapter extends DBAdapter {
 
     var collection = await _connection.collection(delete.table.tableName);
     Field pKey = delete.table.getPrimaryKeyField();
-    if (pKey == null) {
-      throw new Exception('Could not delete a table row without primary key.');
-    }
 
     await collection.remove(convertCondition(delete.table, delete.condition));
     return;

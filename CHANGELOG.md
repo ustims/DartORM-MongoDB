@@ -1,3 +1,8 @@
+0.1.3
+-----
+
+- Fixed bug when collection was not available right after creation
+
 0.1.2
 -----
 
