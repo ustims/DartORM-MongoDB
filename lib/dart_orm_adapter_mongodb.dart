@@ -77,7 +77,7 @@ class MongoDBAdapter extends DBAdapter {
     return w;
   }
 
-  Future<List> select(Select select) async {
+  Future<List<Map<dynamic, dynamic>>> select(Select select) async {
     Completer completer = new Completer();
 
     log.finest('Select:' + select.toString());
@@ -168,7 +168,7 @@ class MongoDBAdapter extends DBAdapter {
     return true;
   }
 
-  Future insert(Insert insert) async {
+  Future<int> insert(Insert insert) async {
     log.finest('Insert:' + insert.toString());
 
     var collection = await _connection.collection(insert.table.tableName);
@@ -186,7 +186,7 @@ class MongoDBAdapter extends DBAdapter {
     return primaryKeyValue;
   }
 
-  Future update(Update update) async {
+  Future<int> update(Update update) async {
     log.finest('Update:' + update.toString());
 
     var collection = await _connection.collection(update.table.tableName);
@@ -206,17 +206,17 @@ class MongoDBAdapter extends DBAdapter {
 
     log.finest('Update result:', updateResult);
 
-    return updateResult;
+    return updateResult.length;
   }
 
-  Future delete(Delete delete) async {
+  Future<int> delete(Delete delete) async {
     log.finest('Delete: ' + delete.toString());
 
     var collection = await _connection.collection(delete.table.tableName);
     Field pKey = delete.table.getPrimaryKeyField();
 
     await collection.remove(convertCondition(delete.table, delete.condition));
-    return;
+    return null;
   }
 
   Future createSequence(Table table, Field field) async {
@@ -253,7 +253,7 @@ class MongoDBAdapter extends DBAdapter {
     _connection
         .executeDbCommand(mongo_connector.DbCommand
             .createQueryDbCommand(_connection, command))
-        .then((Map result) {
+        .then((result) {
       log.finest('Get next sequence result:');
       log.finest(result);
 
